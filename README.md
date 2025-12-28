@@ -125,10 +125,17 @@ We include comprehensive scripts to verify your deployment:
 
 ---
 
-## 🤝 Community & Support
+## 🤝 How to Contribute
 
-This platform is built for developers by developers.
+We welcome contributions! Please see our **[Contribution Guidelines](CONTRIBUTING.md)** for a step-by-step guide on how to:
+
+-   Fork and Clone the repo
+-   Set up your development environment
+-   Create a Pull Request (PR)
+-   Follow our coding standards
+
+### Join the Community
 *   **Issues**: Submit bugs/feature requests on GitHub.
-*   **Contributions**: PRs are welcome! Please follow the coding standards.
+*   **Discussions**: Ask questions and share ideas.
 
 **Built with ❤️ using [LiveKit](https://livekit.io) and [Vobiz](https://vobiz.ai).**
