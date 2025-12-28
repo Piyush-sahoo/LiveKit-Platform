@@ -12,28 +12,29 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - api
+      - gateway
     restart: unless-stopped
     networks:
       - vobiz-network
 
   # ===================
-  # BACKEND API
+  # API GATEWAY
   # ===================
-  api:
+  gateway:
     build:
-      context: ./livekit-outbound-calls
-      dockerfile: Dockerfile
-    container_name: vobiz-api
-    command: python run_server.py
+      context: ./backend
+      dockerfile: services/gateway/Dockerfile
+    container_name: vobiz-gateway
+    command: python services/gateway/run_server.py
     ports:
       - "8000:8000"
     env_file:
-      - ./livekit-outbound-calls/.env.local
+      - ./backend/.env.local
     environment:
       - REDIS_HOST=redis
     depends_on:
       - redis
+      - config
     restart: unless-stopped
     networks:
       - vobiz-network
@@ -45,16 +46,92 @@ services:
       start_period: 10s
 
   # ===================
+  # CONFIGURATION SERVICE
+  # ===================
+  config:
+    build:
+      context: ./backend
+      dockerfile: services/config/Dockerfile
+    container_name: vobiz-config
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./backend/.env.local
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - vobiz-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ===================
+  # ANALYTICS SERVICE
+  # ===================
+  analytics:
+    build:
+      context: ./backend
+      dockerfile: services/analytics/Dockerfile
+    container_name: vobiz-analytics
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./backend/.env.local
+    depends_on:
+      - redis
+      - config
+    restart: unless-stopped
+    networks:
+      - vobiz-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ===================
+  # ORCHESTRATION SERVICE
+  # ===================
+  orchestration:
+    build:
+      context: ./backend
+      dockerfile: services/orchestration/Dockerfile
+    container_name: vobiz-orchestration
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./backend/.env.local
+    depends_on:
+      - redis
+      - config
+    restart: unless-stopped
+    networks:
+      - vobiz-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ===================
   # LIVEKIT AGENT
   # ===================
   agent:
     build:
-      context: ./livekit-outbound-calls
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: services/agent/Dockerfile
     container_name: vobiz-agent
-    command: python run_agent.py start
+    command: python services/agent/run_agent.py start
     env_file:
-      - ./livekit-outbound-calls/.env.local
+      - ./backend/.env.local
     environment:
       - REDIS_HOST=redis
     depends_on:
@@ -88,12 +165,12 @@ services:
   # ===================
   celery-worker:
     build:
-      context: ./livekit-outbound-calls
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: services/orchestration/Dockerfile
     container_name: vobiz-celery
-    command: celery -A tasks_queue.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A services.orchestration.tasks_queue.celery_app worker --loglevel=info --concurrency=4
     env_file:
-      - ./livekit-outbound-calls/.env.local
+      - ./backend/.env.local
     environment:
       - REDIS_HOST=redis
     depends_on:
@@ -102,25 +179,10 @@ services:
     networks:
       - vobiz-network
 
-  # ===================
-  # MONGODB (Optional - Comment out if using MongoDB Atlas)
-  # ===================
-  # mongodb:
-  #   image: mongo:7
-  #   container_name: vobiz-mongodb
-  #   ports:
-  #     - "27017:27017"
-  #   volumes:
-  #     - mongodb_data:/data/db
-  #   restart: unless-stopped
-  #   networks:
-  #     - vobiz-network
-
 # ===================
 # VOLUMES
 # ===================
 volumes:
-  # mongodb_data:  # Uncomment if using local MongoDB
   redis_data:
 
 # ===================
