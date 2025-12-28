@@ -1,163 +1,134 @@
-# Voice AI Platform (Vobiz)
+# Open Source Voice Agent Platform
 
-A production-ready, scalable Voice AI orchestration platform built with LiveKit, OpenAI/Azure, Deepgram, and Next.js.
+**The complete, production-ready platform for building, deploying, and managing Voice AI Agents.**  
+_Built on [LiveKit](https://livekit.io/) (Real-time WebRTC) and [Vobiz](https://vobiz.ai/) (Telephony/SIP)._
 
-## 🚀 Features
+> 🚀 **An Open Source Alternative to Vapi, Retell AI, and Bland AI.**
 
-*   **Real-time Voice Agents**: Low-latency conversational AI using LiveKit Agents.
-*   **Outbound Campaigns**: Schedule and blast calls via CSV upload using Celery & Redis.
-*   **Inbound Handling**: SIP trunking support for receiving calls.
-*   **Call Analytics**: Detailed logs, recording playback (S3 compatible), and cost estimation.
-*   **Modern UI**: React/Next.js frontend with shading/dark mode support.
-*   **Scalable Architecture**: Dockerized services for API, worker, frontend, and redis.
+This platform provides everything you need to build scalable, low-latency voice agents that can handle inbound and outbound calls, manage campaigns, and provide detailed analytics—all in your own infrastructure.
 
-## 🛠️ Tech Stack
+---
 
-*   **Frontend**: React, Vite, TailwindCSS, Shadcn/UI
-*   **Backend**: Python (FastAPI), LiveKit SDK
-*   **Database**: MongoDB (Atlas or Local)
-*   **Queue**: Redis + Celery
-*   **Voice/AI**: LiveKit, Deepgram (STT), OpenAI/Azure (LLM/TTS)
-*   **Infrastructure**: Docker Compose
+## 🌟 Why This Platform?
 
-## 📋 Prerequisites
+Unlike proprietary APIs that lock you in, this **Open Source Voice Agent Platform** gives you full control:
 
+*   **⚡ Low Latency**: Powered by LiveKit's Real-time Transport for instant voice response.
+*   **📞 Telephony Integration**: Seamless SIP trunking via **Vobiz** for reliable inbound/outbound calls.
+*   **🤖 Multi-LLM Support**: Bring your own models (OpenAI, Deepgram, Azure, Groq).
+*   **📡 Microservices Architecture**: fully modular backend for infinite scalability.
+*   **📊 Comprehensive Analytics**: Built-in call recording, cost tracking, and sentiment analysis.
+*   **🛠️ Developer First**: Complete API, Webhooks, and easy-to-use React frontend.
+
+---
+
+## 🏗️ Architecture
+
+The platform is designed as a modern microservices system:
+
+```mermaid
+graph TD
+    Client[Frontend / API Client] --> Gateway[API Gateway (Port 8000)]
+    Gateway --> ConfigService[Config Service (Port 8002)]
+    Gateway --> AnalyticsService[Analytics Service (Port 8001)]
+    Gateway --> OrchestrationService[Orchestration Service (Port 8003)]
+    
+    OrchestrationService --> Redis[Redis Queue]
+    Redis --> Worker[Agent Worker]
+    Worker --> LiveKit[LiveKit Server]
+    LiveKit --> Vobiz[Vobiz Telephony]
+    Vobiz --> Phone[PSTN Network]
+```
+
+### Core Services
+1.  **Gateway Service**: Unified API entry point (Auth, Routing).
+2.  **Config Service**: Manages Assistants, Phone Numbers, SIP Trunks, and Tools.
+3.  **Analytics Service**: Handles Call Logs, Recordings (S3), and Analysis.
+4.  **Orchestration Service**: Manages Outbound Campaigns and Job Queues.
+5.  **Agent Worker**: Python worker running the actual Voice AI logic (LiveKit Agents).
+
+---
+
+## ⚡ Quick Start
+
+Get the entire platform running in minutes using Docker.
+
+### Prerequisites
 *   Docker & Docker Compose
-*   Node.js 18+ (for local frontend dev)
-*   Python 3.10+ (for local backend dev)
-*   LiveKit Cloud Account (or self-hosted)
-*   OpenAI API Key
-*   MongoDB URI
+*   **Vobiz Account** (for SIP Telephony)
+*   **LiveKit Cloud/Self-hosted**
+*   **OpenAI/Deepgram API Keys**
 
-## ⚡ Quick Start (Docker)
-
-To run the entire platform instantly:
-
+### 1. Clone & Configure
 ```bash
-# 1. Clone the repository
 git clone https://github.com/Piyush-sahoo/Voice-AI-Platform.git
 cd Voice-AI-Platform
 
-# 2. Configure Environment
-# Create livekit-outbound-calls/.env.local with your keys (see .env.example)
+# Configure backend environment
+# Copy example env and fill in your keys
+cp backend/.env.example backend/.env.local
+```
 
-# 3. Launch
+### 2. Run with Docker Compose
+```bash
 docker-compose up -d --build
 ```
-Access the **Frontend** at http://localhost:3000 and **API Docs** at http://localhost:8000/docs.
+This launches:
+*   **Frontend Dashboard**: `http://localhost:3000`
+*   **API Gateway**: `http://localhost:8000`
+*   **Agent Worker**: Connected to LiveKit
+*   **Redis & MongoDB**: Infrastructure
+
+---
 
 ## 📚 API Documentation
 
-A comprehensive **Postman Collection** is included in the project to help you test the API endpoints.
+We follow an API-first design. A complete Postman collection is available for testing:
+📂 **[`postman/postman_collection.json`](./postman/postman_collection.json)**
 
-*   **Location**: [`postman/postman_collection.json`](./postman/postman_collection.json)
-*   **Usage**: Import this file into Postman to see pre-configured requests for Authentication, Campaigns, Calls, and more.
-
----
-
-## 💻 Local Development Setup
-
-If you want to contribute or develop features, it's best to run services locally.
-
-### Backend Setup (Python/FastAPI)
-
-1.  **Navigate directly** to the backend directory:
-    ```bash
-    cd livekit-outbound-calls
-    ```
-2.  **Create Virtual Environment**:
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # Windows: .\venv\Scripts\activate
-    ```
-3.  **Install Dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  **Set Environment Variables**:
-    Create `.env.local` and add your keys (LiveKit, OpenAI, Mongo, AWS S3).
-5.  **Run Redis**:
-    Ensure, you have a local Redis instance running (or use Docker for just Redis).
-    ```bash
-    docker run -d -p 6379:6379 redis:alpine
-    ```
-6.  **Start API Server**:
-    ```bash
-    python run_server.py
-    ```
-7.  **Start Worker Agent** (in a new terminal):
-    ```bash
-    python run_agent.py start
-    ```
-
-### Frontend Setup (React/Vite)
-
-1.  **Navigate** to the frontend directory:
-    ```bash
-    cd frontend
-    ```
-2.  **Install Packages**:
-    ```bash
-    npm install
-    ```
-3.  **Configure API URL**:
-    Create `.env` file:
-    ```env
-    VITE_API_URL=http://localhost:8000
-    ```
-4.  **Run Dev Server**:
-    ```bash
-    npm run dev
-    ```
-    The app will proceed to run at http://localhost:5173 (usually).
+### Key Endpoint Areas
+*   `POST /api/auth/login` - JWT Authentication
+*   `POST /api/assistants` - Create/Manage AI Personas
+*   `POST /api/calls` - Trigger Outbound Calls
+*   `GET /api/analytics/calls` - Retrieve Call Logs & Recordings
+*   `POST /api/campaigns` - Launch Bulk Call Blasts
 
 ---
 
-## 🤝 How to Contribute
+## 🧪 Automated Testing
 
-We welcome contributions! specifically fixes, improvements, and new features.
+We include comprehensive scripts to verify your deployment:
 
-1.  **Fork** the repository on GitHub.
-2.  **Clone** your fork locally.
-3.  **Create a Branch** for your feature:
+1.  **Full Automation Test**: Creates agents, numbers, and makes real calls.
     ```bash
-    git checkout -b feature/my-new-feature
+    python scripts/full_api_automation.py
     ```
-4.  **Commit** your changes:
+2.  **API Key Auth Test**: Verifies security and programmatic access.
     ```bash
-    git commit -m "Add some amazing feature"
+    python scripts/test_api_key_auth.py
     ```
-5.  **Push** to your branch:
-    ```bash
-    git push origin feature/my-new-feature
-    ```
-6.  **Open a Pull Request** against the `main` branch.
 
-### Coding Standards
-*   **Backend**: Follow PEP8. Use type hints.
-*   **Frontend**: Use functional components and strict TypeScript typing.
-*   **Commits**: Use clear, descriptive commit messages.
+---
 
 ## 📂 Project Structure
 
 ```
-├── frontend/                 # React UI application
-│   ├── src/                 # Source code
-│   │   ├── components/      # Reusable UI components (Shadcn)
-│   │   ├── pages/           # Route pages (Dashboard, Calls, etc.)
-│   │   └── lib/             # API clients and utils
-├── livekit-outbound-calls/   # Python Backend & Agent
-│   ├── agent/               # LiveKit Worker Agent logic
-│   ├── api/                 # FastAPI Router & Endpoints
-│   ├── services/            # Core business logic (S3, SIP, Calls)
-│   ├── tasks_queue/         # Celery Worker for Campaigns
-│   └── database/            # MongoDB Models & Connection
-└── docker-compose.yml        # Orchestration
+├── backend/                  # Microservices Backend
+│   ├── gateway/             # API Gateway (FastAPI)
+│   ├── services/            # Microservices (Config, Analytics, Orchestration)
+│   └── shared/              # Shared Libs (Db, Auth, Settings)
+├── frontend/                 # React/Next.js Dashboard
+├── scripts/                  # Automation & Testing Scripts
+├── postman/                  # API Collections
+└── docker-compose.yml        # Infrastructure Definition
 ```
 
-## 🔒 Security Note
-*   **Authentication**: The system uses JWT. Ensure `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are kept secret (use `.env.local`).
-*   **S3**: Recordings are private; the backend generates signed URLs for authorized users only.
+---
 
-## 📄 License
-MIT License. See `LICENSE` for more information.
+## 🤝 Community & Support
+
+This platform is built for developers by developers.
+*   **Issues**: Submit bugs/feature requests on GitHub.
+*   **Contributions**: PRs are welcome! Please follow the coding standards.
+
+**Built with ❤️ using [LiveKit](https://livekit.io) and [Vobiz](https://vobiz.ai).**
