@@ -11,6 +11,7 @@ from shared.database.models import (
     UpdateAssistantRequest,
 )
 from shared.database.connection import get_database
+from shared.cache import SessionCache
 
 logger = logging.getLogger("assistant_service")
 
@@ -37,17 +38,28 @@ class AssistantService:
         await db.assistants.insert_one(assistant.to_dict())
         logger.info(f"Created assistant: {assistant.assistant_id} - {assistant.name}")
         
+        # Invalidate assistants list cache
+        if workspace_id:
+            await SessionCache.invalidate_assistants(workspace_id)
+        
         return assistant
     
     @staticmethod
     async def get_assistant(assistant_id: str, workspace_id: str = None) -> Optional[Assistant]:
         """Get an assistant by ID."""
+        # Check cache first
+        cached = await SessionCache.get_assistant(assistant_id)
+        if cached:
+            return Assistant.from_dict(cached)
+        
         db = get_database()
         query = {"assistant_id": assistant_id}
         if workspace_id:
             query["workspace_id"] = workspace_id
         doc = await db.assistants.find_one(query)
         if doc:
+            # Cache the result
+            await SessionCache.cache_assistant(assistant_id, doc)
             return Assistant.from_dict(doc)
         return None
     
@@ -111,6 +123,8 @@ class AssistantService:
             
             if result:
                 logger.info(f"Updated assistant: {assistant_id}")
+                # Invalidate cache
+                await SessionCache.invalidate_assistant(assistant_id, workspace_id)
                 return Assistant.from_dict(result)
         
         return None
@@ -126,6 +140,8 @@ class AssistantService:
         
         if result.deleted_count > 0:
             logger.info(f"Deleted assistant: {assistant_id}")
+            # Invalidate cache
+            await SessionCache.invalidate_assistant(assistant_id, workspace_id)
             return True
         return False
     

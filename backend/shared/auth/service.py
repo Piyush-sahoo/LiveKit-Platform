@@ -114,6 +114,26 @@ class AuthService:
         # Generate tokens
         tokens = AuthService._create_tokens(user)
         
+        # Preload session data into Redis for fast access
+        try:
+            from shared.cache import SessionCache
+            user_cache_data = {
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "workspace_id": user.workspace_id,
+                "role": user.role,
+            }
+            await SessionCache.preload_session(
+                user.user_id, 
+                user.workspace_id, 
+                user_cache_data
+            )
+        except Exception as e:
+            # Don't fail login if cache fails
+            import logging
+            logging.getLogger("auth").warning(f"Session cache preload failed: {e}")
+        
         return user, tokens
     
     @staticmethod

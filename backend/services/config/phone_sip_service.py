@@ -13,6 +13,7 @@ from shared.database.models import (
     UpdateSipConfigRequest,
 )
 from shared.database.connection import get_database
+from shared.cache import SessionCache
 
 logger = logging.getLogger("phone_sip_service")
 
@@ -34,6 +35,10 @@ class PhoneNumberService:
         
         await db.phone_numbers.insert_one(phone.to_dict())
         logger.info(f"Added phone number: {phone.phone_id} - {phone.number} (workspace: {workspace_id})")
+        
+        # Invalidate phones cache
+        if workspace_id:
+            await SessionCache.invalidate_phones(workspace_id)
         
         return phone
     
@@ -76,7 +81,12 @@ class PhoneNumberService:
         if workspace_id:
             query["workspace_id"] = workspace_id
         result = await db.phone_numbers.delete_one(query)
-        return result.deleted_count > 0
+        if result.deleted_count > 0:
+            # Invalidate phones cache
+            if workspace_id:
+                await SessionCache.invalidate_phones(workspace_id)
+            return True
+        return False
 
 
 class SipConfigService:
@@ -139,6 +149,9 @@ class SipConfigService:
         
         await db.sip_configs.insert_one(sip.to_dict())
         logger.info(f"Created SIP config: {sip.sip_id} - {sip.name} (trunk: {trunk_id})")
+        
+        # Invalidate SIP cache (global for now, could be workspace-scoped)
+        await SessionCache.delete_pattern("ws:*:sip")
         
         return sip
     
@@ -203,6 +216,8 @@ class SipConfigService:
             )
             
             if result:
+                # Invalidate SIP cache
+                await SessionCache.delete_pattern("ws:*:sip")
                 return SipConfig.from_dict(result)
         
         return None
@@ -212,4 +227,8 @@ class SipConfigService:
         """Delete a SIP configuration."""
         db = get_database()
         result = await db.sip_configs.delete_one({"sip_id": sip_id})
-        return result.deleted_count > 0
+        if result.deleted_count > 0:
+            # Invalidate SIP cache
+            await SessionCache.delete_pattern("ws:*:sip")
+            return True
+        return False

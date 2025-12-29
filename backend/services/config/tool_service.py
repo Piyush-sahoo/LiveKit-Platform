@@ -13,6 +13,7 @@ from shared.database.models import (
     UpdateToolRequest,
 )
 from shared.database.connection import get_database
+from shared.cache import SessionCache
 
 logger = logging.getLogger("tool_service")
 
@@ -51,6 +52,9 @@ class ToolService:
         
         await db.tools.insert_one(tool.to_dict())
         logger.info(f"Created tool: {tool.tool_id} - {tool.name}")
+        
+        # Invalidate tools cache
+        await SessionCache.delete_pattern("ws:*:tools")
         
         return tool
     
@@ -111,6 +115,8 @@ class ToolService:
             )
             
             if result:
+                # Invalidate tools cache
+                await SessionCache.delete_pattern("ws:*:tools")
                 return Tool.from_dict(result)
         
         return None
@@ -120,7 +126,11 @@ class ToolService:
         """Delete a tool."""
         db = get_database()
         result = await db.tools.delete_one({"tool_id": tool_id})
-        return result.deleted_count > 0
+        if result.deleted_count > 0:
+            # Invalidate tools cache
+            await SessionCache.delete_pattern("ws:*:tools")
+            return True
+        return False
     
     @staticmethod
     async def execute_tool(tool: Tool, arguments: Dict[str, Any]) -> str:

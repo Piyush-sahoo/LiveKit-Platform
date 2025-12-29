@@ -11,6 +11,7 @@ from livekit import api
 from shared.database.models import CallRecord, CallStatus, CreateCallRequest
 from shared.database.connection import get_database
 from shared.settings import config
+from shared.cache import SessionCache
 
 logger = logging.getLogger("call_service")
 
@@ -95,6 +96,10 @@ class CallService:
         await db.calls.insert_one(call.to_dict())
         logger.info(f"Created call record: {call_id}")
         
+        # Invalidate calls cache
+        if workspace_id:
+            await SessionCache.invalidate_calls(workspace_id)
+        
         # Dispatch the agent
         await CallService._dispatch_agent(call, assistant_config, sip_trunk_id)
         
@@ -146,6 +151,11 @@ class CallService:
     @staticmethod
     async def get_call(call_id: str, workspace_id: Optional[str] = None) -> Optional[CallRecord]:
         """Get a call record by ID, optionally filtered by workspace (with legacy support)."""
+        # Check cache first
+        cached = await SessionCache.get_call(call_id)
+        if cached:
+            return CallRecord.from_dict(cached)
+        
         db = get_database()
         query = {"call_id": call_id}
         if workspace_id:
@@ -157,6 +167,8 @@ class CallService:
             ]
         doc = await db.calls.find_one(query)
         if doc:
+            # Cache the result
+            await SessionCache.cache_call(call_id, doc)
             return CallRecord.from_dict(doc)
         return None
     
@@ -172,6 +184,8 @@ class CallService:
         )
         
         if result:
+            # Invalidate call cache
+            await SessionCache.delete(f"call:{call_id}")
             return CallRecord.from_dict(result)
         return None
     
