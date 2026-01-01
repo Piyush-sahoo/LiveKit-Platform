@@ -186,12 +186,18 @@ async def get_inbound_assistant_config(room_name: str) -> dict:
         # The dispatch rule creates rooms with prefix "call-" or "inbound-"
         # We need to find which phone number this call came in on
         
+        # Debug: Log all inbound numbers
+        all_inbound = await db.phone_numbers.find({"direction": "inbound"}).to_list(10)
+        logger.info(f"[INBOUND] All inbound numbers in DB: {len(all_inbound)}")
+        for num in all_inbound:
+            logger.info(f"[INBOUND]   -> {num.get('number')} | assistant_id={num.get('assistant_id')} | is_active={num.get('is_active')}")
+        
         # For now, get the first active inbound number's assistant
         # (In production, you'd extract the called number from SIP headers)
         phone_doc = await db.phone_numbers.find_one({
             "direction": "inbound",
             "is_active": True,
-            "assistant_id": {"$exists": True, "$ne": None}
+            "assistant_id": {"$exists": True, "$ne": None, "$ne": ""}
         })
         
         if not phone_doc:
