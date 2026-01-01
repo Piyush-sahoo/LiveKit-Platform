@@ -52,8 +52,9 @@ import {
     X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { campaignsApi, assistantsApi } from "@/lib/api";
+import { campaignsApi, assistantsApi, sipConfigsApi } from "@/lib/api";
 import { format } from "date-fns";
+import { Phone } from "lucide-react";
 
 interface Campaign {
     campaign_id: string;
@@ -76,6 +77,13 @@ interface Assistant {
     name: string;
 }
 
+interface SipConfig {
+    sip_id: string;
+    name: string;
+    from_number: string;
+    is_default?: boolean;
+}
+
 interface Contact {
     phone_number: string;
     name?: string;
@@ -85,6 +93,7 @@ interface Contact {
 export default function Campaigns() {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [assistants, setAssistants] = useState<Assistant[]>([]);
+    const [sipConfigs, setSipConfigs] = useState<SipConfig[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -96,6 +105,7 @@ export default function Campaigns() {
         name: "",
         description: "",
         assistant_id: "",
+        sip_id: "",  // Phone number / SIP config for outbound calls
         max_concurrent_calls: 1,
         scheduled_at: "",
     });
@@ -105,12 +115,14 @@ export default function Campaigns() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [campaignsData, assistantsData] = await Promise.all([
+            const [campaignsData, assistantsData, sipConfigsData] = await Promise.all([
                 campaignsApi.list(),
                 assistantsApi.list(),
+                sipConfigsApi.list().catch(() => ({ sip_configs: [] })),
             ]);
             setCampaigns(campaignsData.campaigns as Campaign[]);
             setAssistants(assistantsData.assistants as Assistant[]);
+            setSipConfigs(sipConfigsData.sip_configs as SipConfig[]);
         } catch (error) {
             toast.error("Failed to load data");
             console.error(error);
@@ -134,6 +146,7 @@ export default function Campaigns() {
             name: "",
             description: "",
             assistant_id: "",
+            sip_id: "",
             max_concurrent_calls: 1,
             scheduled_at: "",
         });
@@ -203,6 +216,7 @@ export default function Campaigns() {
                 name: formData.name,
                 description: formData.description || null,
                 assistant_id: formData.assistant_id,
+                sip_id: formData.sip_id || null,  // Phone number for outbound calls
                 contacts: contacts.map((c) => ({
                     phone_number: c.phone_number,
                     name: c.name,
@@ -484,6 +498,42 @@ export default function Campaigns() {
                             {assistants.length === 0 && (
                                 <p className="text-sm text-muted-foreground">
                                     No agents found. Create an agent first.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Phone Number Selection */}
+                        <div className="space-y-2">
+                            <Label>Outbound Phone Number</Label>
+                            <Select
+                                value={formData.sip_id}
+                                onValueChange={(value) => setFormData({ ...formData, sip_id: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Choose phone number for outbound calls" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {sipConfigs.map((config) => (
+                                        <SelectItem key={config.sip_id} value={config.sip_id}>
+                                            <div className="flex items-center gap-2">
+                                                <Phone className="h-4 w-4" />
+                                                <span>{config.name}</span>
+                                                <span className="text-muted-foreground">({config.from_number})</span>
+                                                {config.is_default && (
+                                                    <Badge variant="outline" className="ml-2 text-xs">Default</Badge>
+                                                )}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {sipConfigs.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    No phone numbers configured. Add one in Phone Numbers page.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">
+                                    The caller ID shown to recipients. Leave empty to use default.
                                 </p>
                             )}
                         </div>

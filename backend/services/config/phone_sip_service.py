@@ -417,11 +417,40 @@ class SipConfigService:
     
     @staticmethod
     async def delete_sip_config(sip_id: str, workspace_id: str = None) -> bool:
-        """Delete a SIP configuration, scoped by workspace."""
+        """Delete a SIP configuration, scoped by workspace. Also deletes trunk from LiveKit."""
+        from livekit import api
+        from shared.settings import config
+        
         db = get_database()
         query = {"sip_id": sip_id}
         if workspace_id:
             query["workspace_id"] = workspace_id
+        
+        # First, get the SIP config to retrieve the trunk_id
+        sip_doc = await db.sip_configs.find_one(query)
+        if not sip_doc:
+            return False
+        
+        trunk_id = sip_doc.get("trunk_id")
+        
+        # Delete from LiveKit if trunk_id exists
+        if trunk_id:
+            try:
+                lk_api = api.LiveKitAPI(
+                    url=config.LIVEKIT_URL,
+                    api_key=config.LIVEKIT_API_KEY,
+                    api_secret=config.LIVEKIT_API_SECRET,
+                )
+                await lk_api.sip.delete_sip_trunk(
+                    api.DeleteSIPTrunkRequest(sip_trunk_id=trunk_id)
+                )
+                await lk_api.aclose()
+                logger.info(f"Deleted LiveKit trunk: {trunk_id}")
+            except Exception as e:
+                # Log but don't fail - trunk might already be deleted or not exist
+                logger.warning(f"Failed to delete LiveKit trunk {trunk_id}: {e}")
+        
+        # Delete from database
         result = await db.sip_configs.delete_one(query)
         if result.deleted_count > 0:
             # Invalidate SIP cache for workspace
@@ -429,5 +458,7 @@ class SipConfigService:
                 await SessionCache.invalidate_sip(workspace_id)
             else:
                 await SessionCache.delete_pattern("ws:*:sip")
+            logger.info(f"Deleted SIP config: {sip_id}")
             return True
         return False
+
